@@ -46,6 +46,9 @@ pip-delete-this-directory.txt
 *.sqlite
 *.sqlite3
 
+# Screenshots
+screenshots/
+
 # Logs
 *.log
 logs/

@@ -1,0 +1,13 @@
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+table1.db
+info5.db
+
+# Screenshots directory
+screenshots/
+
+# OS
+.DS_Store
+Thumbs.db
