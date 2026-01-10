@@ -1,0 +1,65 @@
+<div class="screenshots-page">
+  <h2 *ngIf="auth.isAdmin()">Screenshots - All Employees</h2>
+  <h2 *ngIf="auth.isEmployee()">My Screenshots</h2>
+
+  <!-- Error Message -->
+  <div *ngIf="errorMessage" class="error-message">
+    {{ errorMessage }}
+  </div>
+
+  <!-- Employee Filter - Admin Only -->
+  <div class="filter-section" *ngIf="auth.isAdmin()">
+    <label for="employee-select">Select Employee:</label>
+    <select
+      id="employee-select"
+      [(ngModel)]="selectedEmployeeId"
+      (change)="onEmployeeChange()"
+      class="employee-select"
+    >
+      <option [value]="null">All Employees</option>
+      <option *ngFor="let employee of employees" [value]="employee.id">
+        {{ employee.name }}
+      </option>
+    </select>
+  </div>
+
+  <!-- Date Range Filter - Employee Only -->
+  <div class="filter-section" *ngIf="auth.isEmployee()">
+    <label for="date-range-select">Date Range:</label>
+    <select
+      id="date-range-select"
+      [(ngModel)]="dateRange"
+      (change)="onDateRangeChange()"
+      class="date-range-select"
+    >
+      <option value="today">Today</option>
+      <option value="week">Past 7 Days</option>
+    </select>
+  </div>
+
+  <!-- Loading Indicator -->
+  <div *ngIf="isLoading" class="loading">
+    Loading screenshots...
+  </div>
+
+  <!-- Screenshots Grid -->
+  <div class="grid" *ngIf="!isLoading">
+    <img
+      *ngFor="let ss of screenshots"
+      [src]="'data:image/png;base64,' + ss.filepath"
+      (click)="onClick(ss.id)"
+      class="thumbnail"
+      [alt]="'Screenshot ' + ss.id"
+    />
+    <div *ngIf="screenshots.length === 0" class="no-screenshots">
+      No screenshots found for the selected criteria.
+    </div>
+  </div>
+
+  <!-- Modal for Full Image Preview -->
+  <div class="modal" *ngIf="fullImageUrl">
+    <div class="overlay" (click)="closePreview()"></div>
+    <img [src]="fullImageUrl" class="full-image" />
+  </div>
+</div>
+

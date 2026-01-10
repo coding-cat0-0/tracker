@@ -1,0 +1,299 @@
+<div class="projects-container">
+  <!-- ADMIN VIEW -->
+  <div *ngIf="auth.isAdmin()" class="admin-view">
+    <div class="admin-header">
+      <h1>Projects Management</h1>
+      <button (click)="toggleCreateProjectModal()" class="btn btn-create-project">
+        +
+      </button>
+    </div>
+
+    <!-- Messages -->
+    <div *ngIf="errorMessage" class="alert alert-error">{{ errorMessage }}</div>
+    <div *ngIf="successMessage" class="alert alert-success">{{ successMessage }}</div>
+
+    <!-- CREATE PROJECT MODAL -->
+    <div *ngIf="showCreateProjectModal" class="modal-overlay" (click)="showCreateProjectModal = false">
+      <div class="modal-container" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>Create a Project</h2>
+          <button (click)="toggleCreateProjectModal()" class="btn btn-close">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Project Name Input -->
+          <div class="form-group">
+            <label>Project Name:</label>
+            <input 
+              type="text" 
+              [(ngModel)]="projectName" 
+              placeholder="Enter project name"
+              class="form-control"
+              (keyup.enter)="createProject()">
+          </div>
+
+          <!-- Add Employees Section -->
+          <div class="add-employees-wrapper">
+            <button 
+              (click)="toggleEmployeeSelectionModal()"
+              class="btn btn-add-employees">
+              Add Employees
+            </button>
+
+            <!-- Employee Selection Modal -->
+            <div *ngIf="showEmployeeSelectionModal" class="employee-selection-modal">
+              <div class="selection-header">
+                <h3>Select Employees</h3>
+                <p class="selected-count" *ngIf="selectedEmployeesForCreation.length > 0">
+                  {{ selectedEmployeesForCreation.length }} selected
+                </p>
+              </div>
+
+              <!-- Employees List with Checkboxes -->
+              <div class="employee-selection-list">
+                <div 
+                  *ngFor="let employee of employees"
+                  class="employee-selection-item">
+                  <label class="checkbox-label">
+                    <input 
+                      type="checkbox" 
+                      [checked]="isEmployeeSelectedForCreation(employee.id)"
+                      (change)="toggleEmployeeForCreation(employee.id)"
+                      class="checkbox-input">
+                    <span class="checkbox-custom"></span>
+                    <span class="employee-text">
+                      {{ employee.username }} <br>
+                      <small>{{ employee.email }}</small>
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Add Button -->
+              <div class="selection-footer">
+                <button 
+                  (click)="toggleEmployeeSelectionModal()"
+                  class="btn btn-add-employees-confirm">
+                  Add
+                </button>
+              </div>
+            </div>
+
+            <!-- Selected Employees Display -->
+            <div *ngIf="selectedEmployeesForCreation.length > 0" class="selected-employees-display">
+              <div class="selected-label">Selected Employees:</div>
+              <div class="selected-chips">
+                <div 
+                  *ngFor="let empId of selectedEmployeesForCreation"
+                  class="employee-chip">
+                  {{ getEmployeeUsername(empId) }}
+                  <button 
+                    (click)="toggleEmployeeForCreation(empId)"
+                    class="chip-remove">✕</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="modal-footer">
+          <button 
+            (click)="toggleCreateProjectModal()"
+            class="btn btn-cancel">
+            Cancel
+          </button>
+          <button 
+            (click)="createProject()" 
+            [disabled]="!projectName.trim() || isLoading"
+            class="btn btn-create">
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div *ngIf="isLoading && !showEmployeeSelectionModal" class="loading">
+      Loading projects...
+    </div>
+
+    <!-- PROJECTS VIEW -->
+    <div *ngIf="!showEmployeesList && !isLoading && projects.length > 0" class="projects-grid">
+      <div 
+        *ngFor="let project of projects" 
+        (click)="selectedProjectId = project.id; getEmployeesByProject()"
+        class="project-card"
+        [class.selected]="selectedProjectId === project.id">
+        <div class="project-header">
+          <h3>{{ project.name }}</h3>
+          <span 
+            class="status-badge" 
+            [ngClass]="'status-' + project.status">
+            {{ project.status | uppercase }}
+          </span>
+        </div>
+        <p class="project-info">Click to view employees</p>
+      </div>
+    </div>
+
+    <!-- No Projects -->
+    <div *ngIf="!showEmployeesList && !isLoading && projects.length === 0" class="no-data">
+      No projects found. Create one to get started!
+    </div>
+
+    <!-- EMPLOYEES LIST VIEW (when project is selected) -->
+    <div *ngIf="showEmployeesList" class="employees-list-section">
+      <!-- Back Button and Delete Project -->
+      <div class="list-header">
+        <button (click)="closeEmployeesList()" class="btn btn-secondary">
+          ← Back to Projects
+        </button>
+        <h2>Employees in Project</h2>
+        <button 
+          (click)="deleteProject()" 
+          class="btn btn-danger"
+          title="Delete entire project">
+          🗑️ Delete Project
+        </button>
+      </div>
+
+      <!-- Add Employee Dropdown -->
+      <div class="add-employee-section">
+        <button 
+          (click)="showAddEmployeeDropdown = !showAddEmployeeDropdown"
+          class="btn btn-add">
+          + Add Employee
+        </button>
+        
+        <div *ngIf="showAddEmployeeDropdown" class="employee-dropdown">
+          <div *ngIf="unassignedEmployees.length > 0" class="dropdown-list">
+            <button 
+              *ngFor="let employee of unassignedEmployees"
+              (click)="addEmployeeToProject(employee.id); showAddEmployeeDropdown = false"
+              class="dropdown-item">
+              {{ employee.username }} ({{ employee.email }})
+            </button>
+          </div>
+          <div *ngIf="unassignedEmployees.length === 0" class="dropdown-empty">
+            All employees are already assigned
+          </div>
+        </div>
+      </div>
+
+      <!-- Employees List -->
+      <div class="employees-list">
+        <div *ngIf="isLoading" class="loading">
+          Loading employees...
+        </div>
+
+        <div *ngIf="!isLoading && assignedEmployees.length > 0" class="employee-items">
+          <div 
+            *ngFor="let employee of assignedEmployees"
+            class="employee-item"
+            (mouseenter)="selectedEmployeeId = employee.id"
+            (mouseleave)="selectedEmployeeId = null">
+            <div class="employee-info">
+              <p class="employee-name">{{ employee.username }}</p>
+              <p class="employee-email">{{ employee.email }}</p>
+            </div>
+            <button 
+              *ngIf="selectedEmployeeId === employee.id"
+              (click)="removeEmployeeFromProject()"
+              class="btn btn-delete-small"
+              title="Remove employee">
+              ✕
+            </button>
+          </div>
+        </div>
+
+        <div *ngIf="!isLoading && assignedEmployees.length === 0" class="no-data">
+          No employees assigned to this project
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMPLOYEE VIEW -->
+  <div *ngIf="auth.isEmployee()" class="employee-view">
+    <h1>My Projects</h1>
+
+    <!-- Messages -->
+    <div *ngIf="errorMessage" class="alert alert-error">{{ errorMessage }}</div>
+    <div *ngIf="successMessage" class="alert alert-success">{{ successMessage }}</div>
+
+    <!-- Loading State -->
+    <div *ngIf="isLoading && !showEmployeesList" class="loading">
+      Loading your projects...
+    </div>
+
+    <!-- PROJECTS VIEW -->
+    <div *ngIf="!showEmployeesList && !isLoading && projects.length > 0" class="projects-grid">
+      <div 
+        *ngFor="let project of projects" 
+        (click)="selectedProjectId = project.id; getProjectEmployeesAsEmployee()"
+        class="project-card"
+        [class.selected]="selectedProjectId === project.id">
+        <div class="project-header">
+          <h3>{{ project.name }}</h3>
+          <span 
+            class="status-badge" 
+            [ngClass]="'status-' + project.status">
+            {{ project.status | uppercase }}
+          </span>
+        </div>
+        <p class="project-info">Click to view team members</p>
+      </div>
+    </div>
+
+    <!-- No Projects -->
+    <div *ngIf="!showEmployeesList && !isLoading && projects.length === 0" class="no-data">
+      No projects assigned to you
+    </div>
+
+    <!-- EMPLOYEES LIST VIEW (when project is selected) -->
+    <div *ngIf="showEmployeesList" class="employees-list-section employee-list-view">
+      <!-- Back Button and Status Update -->
+      <div class="list-header">
+        <button (click)="closeEmployeesList()" class="btn btn-secondary">
+          ← Back to Projects
+        </button>
+        <h2>Team Members</h2>
+        <div class="status-update">
+          <select [(ngModel)]="selectedStatus" class="form-control">
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="completed">Completed</option>
+          </select>
+          <button 
+            (click)="updateProjectStatus()"
+            class="btn btn-primary">
+            Update Status
+          </button>
+        </div>
+      </div>
+
+      <!-- Employees List (Read-only) -->
+      <div class="employees-list">
+        <div *ngIf="isLoading" class="loading">
+          Loading team members...
+        </div>
+
+        <div *ngIf="!isLoading && assignedEmployees.length > 0" class="employee-items">
+          <div 
+            *ngFor="let employee of assignedEmployees"
+            class="employee-item read-only">
+            <div class="employee-info">
+              <p class="employee-name">{{ employee.username }}</p>
+              <p class="employee-email">{{ employee.email }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="!isLoading && assignedEmployees.length === 0" class="no-data">
+          No team members assigned to this project
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

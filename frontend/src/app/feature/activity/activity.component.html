@@ -1,0 +1,41 @@
+<div class="page">
+  <div class="card activity-card">
+
+    <div class="flex space-between header">
+      <div>
+        <h2>Activity Tracking</h2>
+        <p class="text-muted">Track your working time</p>
+      </div>
+
+      <div class="status-indicator"
+           [class.active]="isTracking && !isIdle"
+           [class.idle]="isTracking && isIdle"
+           [class.inactive]="!isTracking">
+      </div>
+    </div>
+
+    <div class="timer-wrapper">
+      <h1 class="timer">
+        {{ formatTime(elapsedSeconds) }}
+      </h1>
+      <p class="text-muted">Hours : Minutes : Seconds</p>
+    </div>
+
+    <div class="controls">
+      <button
+        class="btn-primary start"
+        (click)="startTracking()"
+        [disabled]="isTracking">
+        Start
+      </button>
+
+      <button
+        class="btn-primary stop"
+        (click)="stopTracking()"
+        [disabled]="!isTracking">
+        Stop
+      </button>
+    </div>
+
+  </div>
+</div>

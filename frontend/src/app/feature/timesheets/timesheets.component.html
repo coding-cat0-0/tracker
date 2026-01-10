@@ -1,0 +1,196 @@
+<div class="timesheets-container">
+  <!-- Admin View: Employee Filter -->
+  <div *ngIf="auth.isAdmin()" class="admin-view">
+    <h1>Employee Timesheets</h1>
+
+    <div class="filter-section">
+      <label for="employee-select">Select Employee:</label>
+      <select
+        id="employee-select"
+        [(ngModel)]="selectedEmployeeId"
+        (change)="onEmployeeChange()"
+        class="employee-select"
+      >
+        <option [value]="null">All Employees</option>
+        <option *ngFor="let employee of employees" [value]="employee.id">
+          {{ employee.name }}
+        </option>
+      </select>
+    </div>
+
+    <!-- Admin Timesheets Table -->
+    <div *ngIf="!isLoading" class="timesheets-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Start Time</th>
+            <th>End Time</th>
+            <th>Total Time</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let ts of timesheets">
+            <td>{{ ts.work_date }}</td>
+            <td>{{ ts.start_time }}</td>
+            <td>{{ ts.end_time || '-' }}</td>
+            <td>{{ ts.total_seconds || 0 }}s</td>
+            <td>{{ ts.status }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Employee View: Sidebar + Main Content -->
+  <div *ngIf="auth.isEmployee()" class="employee-view">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <h3>Timesheet</h3>
+      <button
+        (click)="setDateRange('today')"
+        [class.active]="dateRange === 'today'"
+        class="sidebar-btn"
+      >
+        Daily
+      </button>
+      <button
+        (click)="setDateRange('week')"
+        [class.active]="dateRange === 'week'"
+        class="sidebar-btn"
+      >
+        Weekly
+      </button>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Header with Refresh Button -->
+      <div class="header-section">
+        <h1>Current Timesheet</h1>
+        <button
+          class="refresh-btn"
+          (click)="refreshTimesheets()"
+          [disabled]="isRefreshing"
+          [class.refreshing]="isRefreshing"
+          title="Refresh timesheet data"
+        >
+          <span>Refresh</span>
+        </button>
+      </div>
+
+      <!-- Error Message -->
+      <div *ngIf="errorMessage" class="error-message">
+        {{ errorMessage }}
+      </div>
+
+      <!-- Loading Indicator -->
+      <div *ngIf="isLoading" class="loading">
+        Loading timesheets...
+      </div>
+
+      <!-- User Stats Section - All in One Container -->
+      <div *ngIf="!isLoading && auth.isEmployee()" class="user-stats">
+        <div class="stat-card-unified">
+          <div class="user-section">
+            <div class="avatar">{{ userName.charAt(0).toUpperCase() }}</div>
+            <div class="user-info-text">
+              <h3>{{ userName }}</h3>
+            </div>
+          </div>
+
+          <div class="date-section">
+            <div class="date-value">{{ getFormattedDate() }}</div>
+            <div class="date-label">{{ getDayOfWeek() }}</div>
+          </div>
+
+          <div class="time-section">
+            <div class="time-stat">
+              <div class="time-value total">{{ totalTimeSeconds }}s</div>
+              <div class="time-label">Total Time</div>
+            </div>
+            <div class="time-stat">
+              <div class="time-value idle">{{ idleTimeSeconds }}s</div>
+              <div class="time-label">Idle Time</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timesheet Cards Container -->
+      <div *ngIf="!isLoading && timesheets.length > 0" class="timesheets-cards">
+        <div *ngFor="let ts of timesheets" class="timesheet-card">
+          <!-- Card Header: Start and End Times -->
+          <div class="card-header">
+            <div class="time-info">
+              <div class="start-time">
+                <span class="label">START</span>
+                <span class="value">{{ ts.start_time | slice:0:5 }}</span>
+              </div>
+              <div class="duration">
+                <span class="value">{{ ts.total_seconds || 0 }}s</span>
+              </div>
+              <div class="end-time">
+                <span class="label">END</span>
+                <span class="value">{{ (ts.end_time | slice:0:5) || '-' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Activity Container: App Usage -->
+          <div class="activity-container" *ngIf="getAppUsagesForTimesheet(ts.id).length > 0">
+            <h4 class="activity-header">Activity</h4>
+            <div class="activity-list">
+              <div *ngFor="let usage of getAppUsagesForTimesheet(ts.id)" class="activity-item">
+                <div class="app-name">{{ usage.app }}</div>
+                <div class="app-duration">{{ usage.duration || 0 }}s</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Idle Periods Container -->
+          <div class="idle-container" *ngIf="ts.idle_seconds && ts.idle_seconds > 0">
+            <h4 class="idle-header">Idle Periods</h4>
+            <div class="idle-duration">{{ ts.idle_seconds }}s</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- App Usage Container (Old - for summary) -->
+      <div *ngIf="!isLoading && appUsages.length > 0" class="app-container">
+        <div class="container-header">
+          <h2>Activity Summary</h2>
+        </div>
+
+        <div class="app-list">
+          <div *ngFor="let app of appUsages" class="app-item">
+            <h4>{{ app.app_name }}</h4>
+            <div class="app-details">
+              <span class="total">TOTAL: {{ formatSeconds(app.total_duration) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Idle Periods Container (Old - for summary) -->
+      <div *ngIf="!isLoading && idlePeriods.length > 0" class="idle-container">
+        <h3>Idle Periods Summary</h3>
+        <div class="idle-list">
+          <div *ngFor="let period of idlePeriods" class="idle-period">
+            {{ period.start_time }} - {{ period.end_time }} ({{ period.duration_minutes }}
+            min)
+          </div>
+        </div>
+        <div class="total-idle">
+          <strong>Total Idle Time: {{ idleTime }}</strong>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div *ngIf="!isLoading && timesheets.length === 0" class="empty-state">
+        No timesheets found for the selected period.
+      </div>
+    </main>
+  </div>
+</div>

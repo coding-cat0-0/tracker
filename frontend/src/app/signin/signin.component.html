@@ -1,0 +1,38 @@
+<div class="signin-container" id="signin">
+  <form (ngSubmit)="onSubmit()" #signupForm="ngForm">
+    <h2>Signin here</h2>
+
+    <div class="form-fields">
+      <input
+        type="text"
+        name="username"
+        [(ngModel)]="username"
+        placeholder="Username"
+        required
+      />
+
+      <div class="password-wrapper">
+        <input
+          [type]="showPassword ? 'text' : 'password'"
+          name="password"
+          [(ngModel)]="password"
+          placeholder="Password"
+          required
+        />
+
+        <mat-icon
+          class="password-toggle"
+          (click)="togglePassword()"
+        >
+          {{ showPassword ? 'visibility' : 'visibility_off' }}
+        </mat-icon>
+      </div>
+
+      <button type="submit" class="btn-primary">
+        Sign In
+      </button>
+
+      <p (click)="onClick()">Don't have an account?</p>
+    </div>
+  </form>
+</div>

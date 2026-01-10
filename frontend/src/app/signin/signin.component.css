@@ -1,0 +1,82 @@
+:host {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(180deg, #eef9f7, #f4fbff);
+}
+
+.signin-container,
+.signup-container {
+  background: #ffffff;
+  width: 460px;
+  padding: 42px 40px;
+  border-radius: 22px;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.12);
+}
+
+
+.signin-container h2,
+.signup-container h2 {
+  text-align: center;
+  margin-bottom: 26px;
+  font-size: 28px;
+  color: #2f3a4f;
+}
+
+
+.form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+
+.form-fields input {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #cfd8dc;
+  font-size: 15px;
+  outline: none;
+}
+
+.form-fields input:focus {
+  border-color: #2cc7b7;
+  box-shadow: 0 0 0 3px rgba(44, 199, 183, 0.15);
+}
+
+.password-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.password-wrapper input {
+  width: 100%;
+  padding-right: 44px; 
+}
+
+.password-toggle {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  font-size: 20px;
+  color: #7a7a7a;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.password-toggle:hover {
+  transform: translateY(-50%) scale(1.25);
+}
+
+.form-fields p {
+  text-align: center;
+  font-size: 14px;
+  color: #2b8cff;
+  cursor: pointer;
+}
+
+.form-fields p:hover {
+  text-decoration: underline;
+}

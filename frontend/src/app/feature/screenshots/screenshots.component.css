@@ -1,0 +1,49 @@
+.screenshots-page {
+  padding: 20px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 200px);
+  gap: 15px;
+}
+
+.thumbnail {
+  width: 200px;
+  height: 130px;
+  object-fit: cover;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: transform 0.2s ease;
+}
+
+.thumbnail:hover {
+  transform: scale(1.05);
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.overlay {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.7);
+}
+
+.full-image {
+  position: relative;
+  max-width: 90%;
+  max-height: 90%;
+  margin: auto;
+  display: block;
+  top: 50%;
+  transform: translateY(-50%);
+  border-radius: 8px;
+}
