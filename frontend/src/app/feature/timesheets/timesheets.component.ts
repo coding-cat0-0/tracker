@@ -1,6 +1,6 @@
 import { AuthService } from '../../services/authservice';
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { HttpClient, HttpClientModule } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -15,20 +15,8 @@ interface Timesheet {
   idle_seconds: number | null;
 }
 
-interface AppUsageRecord {
-  id: number;
-  timesheet_id: number;
-  employee_id: number;
-  app: string;
-  duration: number;
-  timestamp: string;
-  role: string;
-}
-
 interface TimesheetResponse {
-  timesheets: Timesheet[];
-  app_usages_map: { [key: number]: AppUsageRecord[] };
-  idle_times: Array<{ timesheet_id: number; idle_seconds: number }>;
+  timesheets?: Timesheet[] | null;
 }
 
 interface Employee {
@@ -37,12 +25,6 @@ interface Employee {
   name: string;
   email: string;
   role: string;
-}
-
-interface AppUsage {
-  app_name: string;
-  total_duration: number;
-  last_active: string;
 }
 
 interface IdlePeriod {
@@ -54,7 +36,7 @@ interface IdlePeriod {
 @Component({
   selector: 'app-timesheets',
   standalone: true,
-  imports: [CommonModule, FormsModule, HttpClientModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './timesheets.component.html',
   styleUrl: './timesheets.component.css'
 })
@@ -67,48 +49,41 @@ export class TimesheetsComponent implements OnInit, OnDestroy {
   isRefreshing = false;
   errorMessage: string | null = null;
 
-  // For storing app usages mapped by timesheet ID
-  appUsagesMap: { [timesheet_id: number]: AppUsageRecord[] } = {};
-
-  // Employee-specific properties
   userName: string = '';
   totalTime: string = '00:00:00';
   idleTime: string = '00:00:00';
   totalTimeSeconds: number = 0;
   idleTimeSeconds: number = 0;
-  appUsages: AppUsage[] = [];
   idlePeriods: IdlePeriod[] = [];
 
   constructor(private http: HttpClient, public auth: AuthService) {}
 
   ngOnDestroy() {
-    // Nothing to clean up - no intervals
   }
 
   ngOnInit() {
-    // Check if user is authenticated
+
     if (!this.auth.isAuthenticated()) {
       this.errorMessage = 'You must be logged in to view timesheets';
       return;
     }
 
-    if (this.auth.isAdmin()) {
-      // Admin: Load employees list first (to populate dropdown), then set username and load timesheets
-      this.loadEmployees().then(() => {
-        this.userName = this.getUserName() || 'Employee';
-        this.loadAllEmployeesTimesheets();
-      });
-    } else if (this.auth.isEmployee()) {
-      console.log('Employee mode - Auth username:', this.auth.username());
-      this.userName = this.auth.username() || 'Employee';
-      console.log('Set userName to:', this.userName);
-      this.loadEmployeeTimesheets();
-    }
+    setTimeout(() => {
+      if (this.auth.isAdmin()) {
+        this.loadEmployees().then(() => {
+          this.userName = this.getUserName() || 'Employee';
+          this.loadAllEmployeesTimesheets();
+        });
+      } else if (this.auth.isEmployee()) {
+        console.log('Employee mode - Auth username:', this.auth.username());
+        this.userName = this.auth.username() || 'Employee';
+        console.log('Set userName to:', this.userName);
+        this.loadEmployeeTimesheets();
+      }
+    }, 0);
   }
 
-  /**
-   * Refresh button: Fetch fresh data from the API based on role
-   */
+
   refreshTimesheets() {
     this.isRefreshing = true;
     let endpoint: string;
@@ -116,31 +91,25 @@ export class TimesheetsComponent implements OnInit, OnDestroy {
     if (this.auth.isAdmin()) {
 
       if (this.selectedEmployeeId === null) {
-
         endpoint = 'http://localhost:9000/admin/get_all_timesheets';
       } else {
         endpoint = `http://localhost:9000/admin/get_user_timesheet?employee_id=${this.selectedEmployeeId}`;
       }
     } else if (this.auth.isEmployee()) {
-    
       endpoint =
         this.dateRange === 'today'
-          ? 'http://localhost:9000/employee/get_employee_timesheet'
+          ? 'http://localhost:9000/employee/get_employee_current_timesheet'
           : 'http://localhost:9000/employee/get_employee_timesheet_week';
     } else {
-      // No valid role
-      this.isRefreshing = false;
+            this.isRefreshing = false;
       this.errorMessage = 'Invalid user role';
       return;
     }
 
-    // Fetch fresh data from the determined endpoint
     this.http.get<TimesheetResponse>(endpoint).subscribe({
       next: (res) => {
-        this.timesheets = res.timesheets;
-        this.appUsagesMap = res.app_usages_map;
-        
-        // Admin: Filter by today, Employee: Calculate totals
+        this.timesheets = res.timesheets || [];
+
         if (this.auth.isAdmin()) {
           this.timesheets = this.filterTimesheetsByDate(this.timesheets);
         } else {
@@ -148,7 +117,7 @@ export class TimesheetsComponent implements OnInit, OnDestroy {
         }
         
         this.isRefreshing = false;
-        console.log('✅ Timesheets refreshed successfully');
+        console.log('Timesheets refreshed successfully');
       },
       error: (error) => {
         console.error('Error refreshing timesheets:', error);
@@ -158,10 +127,11 @@ export class TimesheetsComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Calculate total time and idle time from timesheets
-   */
+
   private calculateTimeTotals() {
+    if (!Array.isArray(this.timesheets)) {
+      this.timesheets = [];
+    }
     let totalSeconds = 0;
     let idleSeconds = 0;
 
@@ -186,14 +156,10 @@ export class TimesheetsComponent implements OnInit, OnDestroy {
     this.idleTimeSeconds = idleSeconds;
     this.totalTime = this.formatSeconds(totalSeconds);
     this.idleTime = this.formatSeconds(idleSeconds);
-
-    this.calculateAppUsage();
     this.calculateIdlePeriods();
   }
 
-  /**
-   * Format seconds to HH:MM:SS format
-   */
+
   formatSeconds(seconds: number): string {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -208,50 +174,7 @@ export class TimesheetsComponent implements OnInit, OnDestroy {
     );
   }
 
-  /**
-   * Get app usages for a specific timesheet ID
-   */
-  getAppUsagesForTimesheet(timesheetId: number): AppUsageRecord[] {
-    return this.appUsagesMap[timesheetId] || [];
-  }
 
-  /**
-   * Calculate app usage breakdown from timesheets
-   */
-  private calculateAppUsage() {
-    const appMap: { [key: string]: AppUsage } = {};
-
-    // Aggregate all app usages from all timesheets
-    Object.values(this.appUsagesMap).forEach(usages => {
-      usages.forEach(usage => {
-        const appName = usage.app || 'Unknown';
-
-        if (!appMap[appName]) {
-          appMap[appName] = {
-            app_name: appName,
-            total_duration: 0,
-            last_active: usage.timestamp
-          };
-        }
-
-        appMap[appName].total_duration += usage.duration || 0;
-        
-        // Update last_active if this record is newer
-        if (usage.timestamp > appMap[appName].last_active) {
-          appMap[appName].last_active = usage.timestamp;
-        }
-      });
-    });
-
-    // Convert map to array and sort by total duration
-    this.appUsages = Object.values(appMap).sort(
-      (a, b) => b.total_duration - a.total_duration
-    );
-  }
-
-  /**
-   * Calculate idle periods from timesheets
-   */
   private calculateIdlePeriods() {
     this.idlePeriods = [];
 
@@ -270,17 +193,25 @@ export class TimesheetsComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Format time to HH:MM format
-   */
   private formatTime(date: Date): string {
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
     return `${hours}:${minutes}`;
   }
-  /**
-   * Admin only: Load all employees for the dropdown filter
-   */
+
+  formatTimeWithAMPM(timeString: string | null): string {
+    if (!timeString) return '-';
+    
+    // Extract HH:MM from datetime string (format: YYYY-MM-DD HH:MM:SS)
+    const timePart = timeString.slice(11, 16);
+    const [hours, minutes] = timePart.split(':').map(Number);
+    
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12; // Convert to 12-hour format
+    
+    return `${displayHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+  }
+
   loadEmployees(): Promise<void> {
     return new Promise((resolve) => {
       this.http.get<Employee[]>('http://localhost:9000/admin/get_all_employees').subscribe({
@@ -297,20 +228,15 @@ export class TimesheetsComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Admin only: Load timesheets for all employees (default view)
-   * NO employee_id parameter needed - backend returns all timesheets
-   */
+
   loadAllEmployeesTimesheets() {
     this.isLoading = true;
     this.errorMessage = null;
     this.selectedEmployeeId = null;
 
-    // Call /get_all_timesheets WITHOUT employee_id parameter
     this.http.get<TimesheetResponse>('http://localhost:9000/admin/get_all_timesheets').subscribe({
       next: (res) => {
-        this.timesheets = this.filterTimesheetsByDate(res.timesheets);
-        this.appUsagesMap = res.app_usages_map;
+        this.timesheets = this.filterTimesheetsByDate(res.timesheets||[]);
         this.isLoading = false;
       },
       error: (error) => {
@@ -321,21 +247,16 @@ export class TimesheetsComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Admin only: Filter by selected employee
-   * Passes employee_id parameter to get specific employee's timesheets
-   */
+ 
   loadEmployeeTimesheetsAdmin(employeeId: number) {
     this.isLoading = true;
     this.errorMessage = null;
 
-    // Call /get_user_timesheet WITH employee_id parameter
     this.http.get<TimesheetResponse>(
       `http://localhost:9000/admin/get_user_timesheet?employee_id=${employeeId}`
     ).subscribe({
       next: (res) => {
-        this.timesheets = this.filterTimesheetsByDate(res.timesheets);
-        this.appUsagesMap = res.app_usages_map;
+        this.timesheets = this.filterTimesheetsByDate(res.timesheets||[]);
         this.isLoading = false;
       },
       error: (error) => {
@@ -346,21 +267,17 @@ export class TimesheetsComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Employee only: Load their own timesheets for current day
-   */
+
   loadEmployeeTimesheets(): Promise<void> {
     this.isLoading = true;
     this.errorMessage = null;
 
     return new Promise((resolve) => {
-      // Employee uses /get_employee_timesheet endpoint for current day
       this.http.get<TimesheetResponse>(
-        'http://localhost:9000/employee/get_employee_timesheet'
+        'http://localhost:9000/employee/get_employee_current_timesheet'
       ).subscribe({
         next: (res) => {
-          this.timesheets = res.timesheets;
-          this.appUsagesMap = res.app_usages_map;
+          this.timesheets = res.timesheets || [];
           this.calculateTimeTotals();
           this.isLoading = false;
           resolve();
@@ -375,20 +292,16 @@ export class TimesheetsComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Employee only: Load their timesheets for past 7 days
-   */
+
   loadEmployeeTimesheetsWeek() {
     this.isLoading = true;
     this.errorMessage = null;
 
-    // Employee uses /get_employee_timesheet_week endpoint for 7 days
     this.http.get<TimesheetResponse>(
       'http://localhost:9000/employee/get_employee_timesheet_week'
     ).subscribe({
       next: (res) => {
-        this.timesheets = res.timesheets;
-        this.appUsagesMap = res.app_usages_map;
+        this.timesheets = res.timesheets || [];
         this.calculateTimeTotals();
         this.isLoading = false;
       },
@@ -400,30 +313,22 @@ export class TimesheetsComponent implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * Filter timesheets to show only today's timesheets
-   */
+
+
   filterTimesheetsByDate(timesheets: Timesheet[]): Timesheet[] {
     const today = new Date().toISOString().split('T')[0];
     return timesheets.filter((t) => t.work_date === today);
   }
 
-  /**
-   * Called when admin changes the employee filter dropdown
-   */
+
   onEmployeeChange() {
     if (this.selectedEmployeeId === null) {
-      // "All Employees" selected
       this.loadAllEmployeesTimesheets();
     } else {
-      // Specific employee selected
       this.loadEmployeeTimesheetsAdmin(this.selectedEmployeeId);
     }
   }
 
-  /**
-   * Called when employee changes the date range via sidebar
-   */
   setDateRange(range: 'today' | 'week') {
     this.dateRange = range;
 
@@ -434,9 +339,6 @@ export class TimesheetsComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * Get username for current logged-in user
-   */
   getUserName(): string {
     const userId = this.auth.userId();
     if (!userId) return 'Employee';
@@ -447,9 +349,6 @@ export class TimesheetsComponent implements OnInit, OnDestroy {
     return employee ? employee.username : 'Employee';
   }
 
-  /**
-   * Get current date formatted (MM-DD-YYYY)
-   */
   getFormattedDate(): string {
     const today = new Date();
     const month = String(today.getMonth() + 1).padStart(2, '0');
@@ -458,17 +357,12 @@ export class TimesheetsComponent implements OnInit, OnDestroy {
     return `${month}-${day}-${year}`;
   }
 
-  /**
-   * Get day of week
-   */
+
   getDayOfWeek(): string {
     const today = new Date();
     return today.toLocaleDateString('en-US', { weekday: 'long' });
   }
 
-  /**
-   * Get current date formatted
-   */
   getCurrentDate(): string {
     const today = new Date();
     return today.toLocaleDateString('en-US', { 

@@ -26,7 +26,6 @@ r = Redis(
     db=0,
     decode_responses=True
 )
-
 @router.post('/start_timesheet')
 async def start_timesheet(session:Session = Depends(get_session),
                current_user: User = Depends(get_current_user("employee"))):
@@ -38,8 +37,10 @@ async def start_timesheet(session:Session = Depends(get_session),
     ).first()
     
     if existing and existing.status == TimesheetStatus.INACTIVE:
+
         existing.status = TimesheetStatus.ACTIVE
-        existing.end_time = None    
+        existing.end_time = None  
+        session.add(existing)
         session.commit()
         session.refresh(existing)
         return {"message": "Timesheet reactivated", "timesheet_id": existing.id}
@@ -387,7 +388,7 @@ def update_task_status(
     session.commit()
     return {"message" : "Task status has been updated"}
 
-BASE_DIR = Path("screenshots")
+BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__))).parent / "screenshots"
 
 
 @router.post("/upload-screenshot")
@@ -414,9 +415,9 @@ async def upload_screenshot(
 
     screenshot = Screenshots(
         employee_id=current_user.id,
-        timesheet_id =time_sheet.id,
-        user_id=current_user.id,
-        filepath=str(file_path)
+        timesheet_id=time_sheet.id,
+        filepath=str(file_path),
+        timestamp=date.today()
     )
     session.add(screenshot)
     session.commit()
@@ -427,23 +428,25 @@ async def upload_screenshot(
     }
 
 
-@router.get("/screenshots")
+@router.get("/get_screenshots")
 def list_screenshots(
     session: Session = Depends(get_session),
     current_user = Depends(get_current_user("employee")),
 ):
     shots = session.exec(
         select(Screenshots)
-        .where(Screenshots.user_id == current_user.id)
-        .order_by(Screenshots.created_at.desc())
+        .where(
+               Screenshots.employee_id == current_user.id,
+               Screenshots.timestamp == date.today())
+        .order_by(Screenshots.timestamp.desc())
     ).all()
 
     return {
         "screenshots": [
             {
                 "id": s.id,
-                "image_url": f"/api/screenshots/{s.id}",
-                "created_at": s.created_at,
+                "image_url": f"/api/screenshot/{s.id}",
+                "timestamp": s.timestamp,
             }
             for s in shots
         ]
@@ -457,14 +460,40 @@ def get_screenshot(
 ):
     s = session.get(Screenshots, id)
 
-    if not s or s.user_id != current_user.id:
+    if not s or s.employee_id != current_user.id:
         raise HTTPException(status_code=404)
 
-    return FileResponse(s.file_path, media_type="image/png")
+    if not os.path.exists(s.filepath):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    return FileResponse(s.filepath, media_type="image/png")
 
 
-@router.get('/get_employee_timesheet')
-def get_employee_timesheet(
+@router.get('/get_employee_screenshots_week')
+def get_employee_screenshots_week(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user("employee"))
+):
+    end_date = date.today()
+    start_date = end_date - timedelta(days=7)
+    
+    screenshots = session.exec(
+        select(Screenshots).where(
+            Screenshots.employee_id == current_user.id,
+            Screenshots.timestamp >= start_date,
+            Screenshots.timestamp <= end_date
+        )
+    ).all()
+    
+    if not screenshots:
+        return {"screenshots": []}
+    
+    return {"screenshots": screenshots}
+
+
+
+@router.get('/get_employee_current_timesheet')
+def get_employee_current_timesheet(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user("employee"))
 ):
@@ -476,29 +505,23 @@ def get_employee_timesheet(
     ).all()
     
     if not timesheets:
-        return {
-            "timesheets": [],
-            "app_usages_map": {},
-            "idle_times": []
+        return  {
+        "timesheets": []
         }
-    
-    timesheet_ids = [ts.id for ts in timesheets]
-    app_usages = session.exec(
-        select(AppUsage).where(AppUsage.timesheet_id.in_(timesheet_ids))
-    ).all()
-    
-    app_usages_map = {}
-    for usage in app_usages:
-        if usage.timesheet_id not in app_usages_map:
-            app_usages_map[usage.timesheet_id] = []
-        app_usages_map[usage.timesheet_id].append(usage)
-    
-    return {
-        "timesheets": timesheets,
-        "app_usages_map": app_usages_map,
-        "idle_times": [{"timesheet_id": ts.id, "idle_seconds": ts.idle_seconds} for ts in timesheets]
+    return    { "timesheets":[
+            {
+                "id": ts.id,
+                "employee_id": ts.employee_id,
+                "work_date": str(ts.work_date),
+                "start_time": ts.start_time.isoformat(),
+                "end_time": ts.end_time.isoformat() if ts.end_time else None,
+                "status": ts.status,
+                "total_seconds": int(ts.total_seconds or 0),
+                "idle_seconds": int(ts.idle_seconds or 0),
+            }
+            for ts in timesheets
+        ] 
     }
-
 
 @router.get('/get_employee_timesheet_week')
 def get_employee_timesheet_week(
@@ -517,71 +540,27 @@ def get_employee_timesheet_week(
     ).all()
     
     if not timesheets:
-        return {
-            "timesheets": [],
-            "app_usages_map": {},
-            "idle_times": []
+        return {"timesheets": [
+            
+        ]}
+    return  {
+    "timesheets": [
+        {
+            "id": ts.id,
+            "employee_id": ts.employee_id,
+            "work_date": str(ts.work_date),
+            "start_time": ts.start_time.isoformat(),
+            "end_time": ts.end_time.isoformat() if ts.end_time else None,
+            "status": ts.status,
+            "total_seconds": int(ts.total_seconds or 0),
+            "idle_seconds": int(ts.idle_seconds or 0),
         }
-    
-    timesheet_ids = [ts.id for ts in timesheets]
-    app_usages = session.exec(
-        select(AppUsage).where(AppUsage.timesheet_id.in_(timesheet_ids))
-    ).all()
-    
-    app_usages_map = {}
-    for usage in app_usages:
-        if usage.timesheet_id not in app_usages_map:
-            app_usages_map[usage.timesheet_id] = []
-        app_usages_map[usage.timesheet_id].append(usage)
-    
-    return {
-        "timesheets": timesheets,
-        "app_usages_map": app_usages_map,
-        "idle_times": [{"timesheet_id": ts.id, "idle_seconds": ts.idle_seconds} for ts in timesheets]
-    }
+        for ts in timesheets
+    ] 
+}
 
 
-@router.get('/get_employee_screenshots')
-def get_employee_screenshots(
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user("employee"))
-):
-    screenshots = session.exec(
-        select(Screenshots).where(
-            Screenshots.employee_id == current_user.id,
-            Screenshots.created_at >= date.today()
-        )
-    ).all()
-    
-    if not screenshots:
-        return {"screenshots": []}
-    
-    return {"screenshots": screenshots}
 
-
-@router.get('/get_employee_screenshots_week')
-def get_employee_screenshots_week(
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user("employee"))
-):
-    end_date = date.today()
-    start_date = end_date - timedelta(days=7)
-    
-    screenshots = session.exec(
-        select(Screenshots).where(
-            Screenshots.employee_id == current_user.id,
-            Screenshots.created_at >= start_date,
-            Screenshots.created_at <= end_date
-        )
-    ).all()
-    
-    if not screenshots:
-        return {"screenshots": []}
-    
-    return {"screenshots": screenshots}
-
-
-# ===== DASHBOARD ENDPOINTS =====
 
 @router.get('/dashboard/stats')
 def get_dashboard_stats(

@@ -1,6 +1,6 @@
 use tauri::State;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use chrono::Utc;
 
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -14,6 +14,7 @@ use windows::Win32::Foundation::{CloseHandle, HWND};
 use windows::Win32::System::SystemInformation::GetTickCount;
 
 #[repr(C)]
+#[allow(non_snake_case)]
 pub struct LASTINPUTINFO {
     pub cbSize: u32,
     pub dwTime: u32,
@@ -80,6 +81,40 @@ pub fn stop_tracking(tracking: State<Arc<Mutex<TrackingState>>>) {
 }
 
 #[tauri::command]
+pub fn resume_tracking(
+    tracking: State<Arc<Mutex<TrackingState>>>,
+    auth: State<Arc<AuthState>>,
+    elapsed: u64,
+) {
+    let mut tracker = tracking.lock().unwrap();
+
+    if tracker.is_tracking {
+        return;
+    }
+
+    tracker.is_tracking = true;
+    let now = Instant::now();
+    let adjust = Duration::from_secs(elapsed);
+    let resume_instant = now.checked_sub(adjust).unwrap_or(now);
+
+    tracker.start_instant = Some(resume_instant);
+    tracker.last_user_activity = now;
+    tracker.last_idle_check = now;
+    tracker.accumulated_idle = 0;
+
+    tracker.current_app = None;
+    tracker.app_start_instant = None;
+
+    if !tracker.screenshot_running {
+        tracker.screenshot_running = true;
+        start_screenshot_worker(
+            tracking.inner().clone(),
+            auth.inner().clone(),
+        );
+    }
+}
+
+#[tauri::command]
 pub fn get_elapsed(tracking: State<Arc<Mutex<TrackingState>>>) -> u64 {
     tracking
         .lock()
@@ -115,7 +150,7 @@ fn get_active_app() -> String {
         let mut buffer = [0u16; 260];
         let len = GetModuleBaseNameW(handle, None, &mut buffer);
 
-        CloseHandle(handle);
+        let _ = CloseHandle(handle);
 
         if len == 0 {
             return "Unknown".into();

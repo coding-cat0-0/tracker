@@ -45,6 +45,11 @@ class Timesheet(SQLModel, table=True):
     total_seconds: int = Field(default=0)
     status: TimesheetStatus = Field(default=TimesheetStatus.INACTIVE, nullable=False)
     idle_seconds: int = Field(default=0)
+
+    @field_validator('total_seconds', 'idle_seconds', mode='before')
+    @classmethod
+    def coerce_int(cls, v):
+        return 0 if v is None else int(v)
     
     @field_validator('total_seconds')
     @classmethod

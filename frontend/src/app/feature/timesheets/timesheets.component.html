@@ -1,5 +1,5 @@
 <div class="timesheets-container">
-  <!-- Admin View: Employee Filter -->
+  <!-- Admin View:  Filter -->
   <div *ngIf="auth.isAdmin()" class="admin-view">
     <h1>Employee Timesheets</h1>
 
@@ -18,7 +18,6 @@
       </select>
     </div>
 
-    <!-- Admin Timesheets Table -->
     <div *ngIf="!isLoading" class="timesheets-table">
       <table>
         <thead>
@@ -43,9 +42,7 @@
     </div>
   </div>
 
-  <!-- Employee View: Sidebar + Main Content -->
   <div *ngIf="auth.isEmployee()" class="employee-view">
-    <!-- Sidebar -->
     <aside class="sidebar">
       <h3>Timesheet</h3>
       <button
@@ -64,9 +61,7 @@
       </button>
     </aside>
 
-    <!-- Main Content -->
     <main class="main-content">
-      <!-- Header with Refresh Button -->
       <div class="header-section">
         <h1>Current Timesheet</h1>
         <button
@@ -85,12 +80,9 @@
         {{ errorMessage }}
       </div>
 
-      <!-- Loading Indicator -->
       <div *ngIf="isLoading" class="loading">
         Loading timesheets...
       </div>
-
-      <!-- User Stats Section - All in One Container -->
       <div *ngIf="!isLoading && auth.isEmployee()" class="user-stats">
         <div class="stat-card-unified">
           <div class="user-section">
@@ -126,52 +118,21 @@
             <div class="time-info">
               <div class="start-time">
                 <span class="label">START</span>
-                <span class="value">{{ ts.start_time | slice:0:5 }}</span>
-              </div>
-              <div class="duration">
-                <span class="value">{{ ts.total_seconds || 0 }}s</span>
+                <span class="value">{{ formatTimeWithAMPM(ts.start_time) }}</span>
               </div>
               <div class="end-time">
                 <span class="label">END</span>
-                <span class="value">{{ (ts.end_time | slice:0:5) || '-' }}</span>
+                <span class="value">{{ formatTimeWithAMPM(ts.end_time) }}</span>
               </div>
             </div>
           </div>
-
-          <!-- Activity Container: App Usage -->
-          <div class="activity-container" *ngIf="getAppUsagesForTimesheet(ts.id).length > 0">
-            <h4 class="activity-header">Activity</h4>
-            <div class="activity-list">
-              <div *ngFor="let usage of getAppUsagesForTimesheet(ts.id)" class="activity-item">
-                <div class="app-name">{{ usage.app }}</div>
-                <div class="app-duration">{{ usage.duration || 0 }}s</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Idle Periods Container -->
           <div class="idle-container" *ngIf="ts.idle_seconds && ts.idle_seconds > 0">
-            <h4 class="idle-header">Idle Periods</h4>
+            <h4 class="idle-header">Idle Period</h4>
             <div class="idle-duration">{{ ts.idle_seconds }}s</div>
           </div>
-        </div>
-      </div>
-
-      <!-- App Usage Container (Old - for summary) -->
-      <div *ngIf="!isLoading && appUsages.length > 0" class="app-container">
-        <div class="container-header">
-          <h2>Activity Summary</h2>
-        </div>
-
-        <div class="app-list">
-          <div *ngFor="let app of appUsages" class="app-item">
-            <h4>{{ app.app_name }}</h4>
-            <div class="app-details">
-              <span class="total">TOTAL: {{ formatSeconds(app.total_duration) }}</span>
-            </div>
           </div>
         </div>
-      </div>
+
 
       <!-- Idle Periods Container (Old - for summary) -->
       <div *ngIf="!isLoading && idlePeriods.length > 0" class="idle-container">

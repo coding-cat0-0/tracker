@@ -6,6 +6,7 @@ import { ActivityComponent } from './feature/activity/activity.component';
 import { TimesheetsComponent } from './feature/timesheets/timesheets.component';
 import { ReportsComponent } from './feature/reports/reports.component';
 import { ProjectsComponent } from './feature/projects/projects.component';
+import { ScreenshotsComponent } from './feature/screenshots/screenshots.component';
 
 
 export const routes: Routes = [
@@ -17,6 +18,7 @@ export const routes: Routes = [
     {path:'timesheets', component:TimesheetsComponent},
     {path:'applications',component:ReportsComponent},
     {path:'projects', component:ProjectsComponent},
+    {path:'screenshots', component:ScreenshotsComponent}
 
 ];
 

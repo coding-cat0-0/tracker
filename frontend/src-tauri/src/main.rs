@@ -19,6 +19,7 @@ fn main() {
             commands::tracking::clear_auth_token,
             commands::tracking::start_tracking,
             commands::tracking::stop_tracking,
+            commands::tracking::resume_tracking,
             commands::tracking::get_elapsed,
             commands::tracking::tick_usage,
         ])

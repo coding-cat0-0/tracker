@@ -1,13 +1,6 @@
 use chrono::{DateTime, Utc};
-use std::path::PathBuf;
 use std::time::Instant;
 use serde::Serialize;
-
-#[derive(Clone)]
-pub struct ScreenshotRecord {
-    pub path: PathBuf,
-    pub timestamp: i64,
-}
 
 #[derive(Serialize, Clone)]
 pub struct UsageRecord {
