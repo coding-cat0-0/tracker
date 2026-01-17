@@ -7,8 +7,12 @@ from fastapi.responses import JSONResponse
 from api.employee import router as employee
 from api.admin import router as admin
 from api.auth_route import router as auth_route
-
+from pathlib import Path
+import os
+from fastapi.staticfiles import StaticFiles
 app = FastAPI()
+
+
 
 app.add_middleware(
     CORSMiddleware,

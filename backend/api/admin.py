@@ -10,7 +10,7 @@ from sqlmodel import Session, select
 from sqlmodel import SQLModel, delete
 from typing import Optional, List
 from fastapi.responses import FileResponse
-from schema import CreateProject, UserInvite
+from schema import CreateProject, UserInvite, UpdateUser, ApplicationRview
 from bg_tasks import send_invitation_email_task
 from auth.jwt_hasher import create_invite_token
 
@@ -493,8 +493,7 @@ def get_applications(
             session:Session = Depends(get_session),
             current_user : User = Depends(get_current_user("admin"))):
 
-    applications = session.exec(select(Applications).where(
-        Applications.employee_id == employee_id)).all()
+    applications = session.exec(select(Applications).where(Applications.employee_id == employee_id)).all()
     if not applications:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="No application submiited by this employee")
@@ -541,21 +540,22 @@ def update_task(
     session.commit()    
     return {"message":"Task has been updated"}
 
-@router.put('review_application')
+@router.put('/review_application')
 def review_application(
-            app_id:int,
-            status:str,             
+            review_data: ApplicationRview,             
+            session:Session = Depends(get_session),             
             current_user : User = Depends(get_current_user("admin"))):
 
-    application = session.get(Applications, app_id)
+    application = session.get(Applications, review_data.app_id)
     if not application:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="No application with this id exists")
-    if status not in ("accepted","rejected"):
+    new_status = review_data.status.lower()
+    if new_status not in ("accepted","rejected"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Status must be either accepted or rejected")
     
-    application.status = status
+    application.status = new_status.upper()
     session.add(application)
     session.commit()    
     return {"message":"Application has been reviewed"}

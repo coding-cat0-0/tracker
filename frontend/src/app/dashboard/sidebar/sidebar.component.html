@@ -1,1 +1,67 @@
-<p>sidebar works!</p>
+<nav class="sidebar">
+  <div class="sidebar-header">
+    <h3>Tracking App</h3>
+  </div>
+  <ul class="nav-links">
+    <li>
+      <a routerLink="/tracking" routerLinkActive="active">
+        <span>Tracker</span>
+      </a>
+    </li>
+    <li class="dropdown-item">
+        <div class="link-wrapper">
+      <a>
+        <span>Timesheet</span>
+      </a>
+      <span class="arrow">▲</span>
+      </div>
+      <ul class="submenu">
+        <li>
+            <a routerLink="/timesheets" [queryParams]="{view:'current'}" routerLinkActive="active">
+                Current
+            </a>
+        </li>
+    <li>
+            <a routerLink="/timesheets" [queryParams]="{view:'weekly'}" routerLinkActive="active">
+                Weekly
+            </a>
+        </li>
+      </ul>
+    </li>
+    <li class="dropdown-item">
+        <div class="link-wrapper">
+      <a>
+        <span>Screenshots</span>
+      </a>
+      <span class="arrow">▲</span>
+      </div>
+      <ul class="submenu">
+        <li>
+            <a routerLink="/screenshots" [queryParams]="{view:'current'}" routerLinkActive="active">
+                Current
+            </a>
+        </li>
+    <li>
+            <a routerLink="/screenshots" [queryParams]="{view:'weekly'}" routerLinkActive="active">
+                Weekly
+            </a>
+        </li>
+      </ul>
+    </li>
+    <li>
+      <a routerLink="/applications" routerLinkActive="active">
+        <span>Applications</span>
+      </a>
+    </li>
+    <li>
+      <a routerLink="/projects" routerLinkActive="active">
+        <span>Projects</span>
+      </a>
+    </li>
+    <li>
+        <a routerLink="/dashboard">
+            <span>Dashboard</span>
+        </a>
+    </li>
+  </ul>
+</nav>

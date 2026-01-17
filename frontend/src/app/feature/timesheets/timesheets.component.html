@@ -43,27 +43,12 @@
   </div>
 
   <div *ngIf="auth.isEmployee()" class="employee-view">
-    <aside class="sidebar">
-      <h3>Timesheet</h3>
-      <button
-        (click)="setDateRange('today')"
-        [class.active]="dateRange === 'today'"
-        class="sidebar-btn"
-      >
-        Daily
-      </button>
-      <button
-        (click)="setDateRange('week')"
-        [class.active]="dateRange === 'week'"
-        class="sidebar-btn"
-      >
-        Weekly
-      </button>
-    </aside>
 
     <main class="main-content">
       <div class="header-section">
-        <h1>Current Timesheet</h1>
+      <h1>
+        {{ dateRange === 'week' ? 'Weekly Timesheets' : 'Current Timesheet' }}
+      </h1>
         <button
           class="refresh-btn"
           (click)="refreshTimesheets()"

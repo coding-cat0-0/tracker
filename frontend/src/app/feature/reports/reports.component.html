@@ -1,21 +1,37 @@
 <div class="applications-container">
   <!-- ADMIN VIEW -->
   <div *ngIf="auth.isAdmin()" class="admin-view">
-    <h1>Leave Applications</h1>
+    <h1>Applications</h1>
     
-    <!-- Employee Filter Dropdown -->
+    <!-- Filter Section (Admin) -->
     <div class="filter-section">
-      <label for="employeeFilter">Filter by Employee:</label>
-      <select 
-        id="employeeFilter" 
-        [(ngModel)]="selectedEmployeeId" 
-        (change)="onEmployeeChange()"
-        class="filter-dropdown">
-        <option [value]="null">All Employees</option>
-        <option *ngFor="let employee of employees" [value]="employee.id">
-          {{ employee.name }} ({{ employee.email }})
-        </option>
-      </select>
+      <div class="filter-group">
+        <label for="employeeFilter">Filter by Employee:</label>
+        <select 
+          id="employeeFilter" 
+          [(ngModel)]="selectedEmployeeId" 
+          (change)="onEmployeeChange()"
+          class="filter-dropdown">
+          <option [value]="null">All Employees</option>
+          <option *ngFor="let employee of employees" [value]="employee.id">
+            {{ employee.username }}
+          </option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="adminStatusFilter">Filter by Status:</label>
+        <select 
+          id="adminStatusFilter" 
+          [(ngModel)]="selectedStatus" 
+          (change)="filterApplicationsByStatus()"
+          class="filter-dropdown">
+          <option value="all">All</option>
+          <option value="pending">Pending</option>
+          <option value="accepted">Accepted</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
     </div>
 
     <!-- Error Message -->
@@ -33,28 +49,41 @@
       <div *ngFor="let app of applications" class="application-card">
         <!-- Header with Username -->
         <div class="card-header">
+          <div class="avatar-circle">
+            {{ getEmployeeName(app.employee_id).charAt(0).toUpperCase() }}
+          </div>
           <h3 class="username">{{ getEmployeeName(app.employee_id) }}</h3>
         </div>
 
         <!-- Content -->
         <div class="card-content">
-          <!-- Reason Badge -->
-          <div class="reason-badge" [ngClass]="'reason-' + app.reason">
-            {{ app.reason | uppercase }}
+          <!-- Top Row: Labels -->
+          <div class="meta-row">
+            <div class="info-item">
+              <span class="info-label">Reason:</span>
+              <div class="reason-badge" [ngClass]="'reason-' + app.reason">
+                {{ app.reason | uppercase }}
+              </div>
+            </div>
+
+            <div class="info-item">
+              <span class="info-label">Status:</span>
+              <div class="status-badge" [ngClass]="'status-' + app.status">
+                {{ app.status | uppercase }}
+              </div>
+            </div>
+
+            <div class="info-item">
+              <span class="info-label">Date:</span>
+              <p class="date">{{ app.created_at | date:'short' }}</p>
+            </div>
           </div>
 
-          <!-- Body/Description (if provided or if reason is 'other') -->
+          <!-- Bottom Row: Description -->
           <div *ngIf="app.body || app.reason === 'other'" class="body-section">
+            <span class="info-label">Description:</span>
             <p class="body-text">{{ app.body || 'No description provided' }}</p>
           </div>
-
-          <!-- Status Badge -->
-          <div class="status-badge" [ngClass]="'status-' + app.status">
-            {{ app.status | uppercase }}
-          </div>
-
-          <!-- Date -->
-          <p class="date">{{ app.created_at | date:'short' }}</p>
         </div>
 
         <!-- Action Buttons (only for pending applications) -->
@@ -84,10 +113,33 @@
   <!-- EMPLOYEE VIEW -->
   <div *ngIf="auth.isEmployee()" class="employee-view">
     <h1>My Applications</h1>
+    
+    <div class="filter-section">
+       <div class="filter-group">
+          <label for="statusFilter">Filter by Status:</label>
+          <select 
+            id="statusFilter" 
+            [(ngModel)]="selectedStatus" 
+            (change)="filterApplicationsByStatus()"
+            class="filter-dropdown">
+            <option value="all">All</option>
+            <option value="pending">Pending</option>
+            <option value="accepted">Accepted</option>
+            <option value="rejected">Rejected</option>
+          </select>
+       </div>
 
-    <!-- Submit New Application Section -->
-    <div class="submit-section">
+       <button 
+          class="btn btn-submit" 
+          (click)="showApplicationForm = true">
+           Create
+       </button>
+    </div>
+    
+    <div class="modal-overlay" *ngIf="showApplicationForm">
+      <div class="submit-section">
       <h2>Submit New Leave Application</h2>
+      
       <div class="form-group">
         <label for="reason">Reason for Leave:</label>
         <select 
@@ -111,31 +163,22 @@
           rows="3"></textarea>
       </div>
 
-      <button 
-        (click)="submitApplication()" 
-        [disabled]="isLoading"
-        class="btn btn-submit">
-        Submit Application
-      </button>
+      <div class="form-actions">
+        <button class="btn btn-reject" (click)="showApplicationForm = false">Cancel</button>
+        <button 
+          (click)="submitApplication()" 
+          [disabled]="isLoading"
+          class="btn btn-save">
+          <span *ngIf="!isLoading">Save</span>
+          <span *ngIf="isLoading">Saving...</span>
+        </button>
+      </div>
+    </div>
     </div>
 
     <!-- Error/Success Messages -->
     <div *ngIf="errorMessage" class="error-message">
       {{ errorMessage }}
-    </div>
-
-    <!-- Status Filter Dropdown -->
-    <div class="filter-section">
-      <label for="statusFilter">Filter by Status:</label>
-      <select 
-        id="statusFilter" 
-        [(ngModel)]="selectedStatus" 
-        (change)="filterApplicationsByStatus()"
-        class="filter-dropdown">
-        <option value="pending">Pending</option>
-        <option value="accepted">Accepted</option>
-        <option value="rejected">Rejected</option>
-      </select>
     </div>
 
     <!-- Loading State -->
@@ -146,30 +189,35 @@
     <!-- Applications Grid -->
     <div *ngIf="!isLoading && filteredApplications.length > 0" class="applications-grid">
       <div *ngFor="let app of filteredApplications" class="application-card employee-card">
-        <!-- Header -->
-        <div class="card-header">
-          <h3>Leave Application</h3>
-        </div>
 
-        <!-- Content -->
         <div class="card-content">
-          <!-- Reason Badge -->
-          <div class="reason-badge" [ngClass]="'reason-' + app.reason">
-            {{ app.reason | uppercase }}
+          <!-- Top Row: Labels -->
+          <div class="meta-row">
+            <div class="info-item">
+              <span class="info-label">Reason:</span>
+              <div class="reason-badge" [ngClass]="'reason-' + app.reason">
+                {{ app.reason | uppercase }}
+              </div>
+            </div>
+
+            <div class="info-item">
+              <span class="info-label">Status:</span>
+              <div class="status-badge" [ngClass]="'status-' + app.status">
+                {{ app.status | uppercase }}
+              </div>
+            </div>
+
+            <div class="info-item">
+              <span class="info-label">Date:</span>
+              <p class="date">{{ app.created_at | date:'short' }}</p>
+            </div>
           </div>
 
-          <!-- Body/Description -->
+          <!-- Bottom Row: Description -->
           <div *ngIf="app.body || app.reason === 'other'" class="body-section">
+            <span class="info-label">Description:</span>
             <p class="body-text">{{ app.body || 'No description provided' }}</p>
           </div>
-
-          <!-- Status Badge -->
-          <div class="status-badge" [ngClass]="'status-' + app.status">
-            {{ app.status | uppercase }}
-          </div>
-
-          <!-- Date -->
-          <p class="date">{{ app.created_at | date:'short' }}</p>
         </div>
 
         <!-- Delete Button (only for pending applications) -->

@@ -93,3 +93,7 @@ class UsageCreate(SQLModel):
     duration: Optional[int] = None
     idle_duration: Optional[int] = None
     timestamp: datetime
+
+class ApplicationRview(SQLModel):
+    app_id: int
+    status: str

@@ -15,6 +15,7 @@ import smtplib
 import os
 from pathlib import Path
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 router = APIRouter(
     tags=['Employee']
@@ -269,6 +270,10 @@ def see_your_applications(status:str|None,
     session:Session=Depends(get_session),
     current_user=Depends(get_current_user("employee"))):
     
+    if status == 'all':
+        applications = session.exec(
+            select(Applications).where(Applications.employee_id == current_user.id)
+        ).all()
     if status == 'pending':
         applications = session.exec(
             select(Applications).where(Applications.employee_id == current_user.id,
@@ -388,8 +393,8 @@ def update_task_status(
     session.commit()
     return {"message" : "Task status has been updated"}
 
-BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__))).parent / "screenshots"
 
+BASE_DIR = Path(__file__).resolve().parents[2] / "screenshots"
 
 @router.post("/upload-screenshot")
 async def upload_screenshot(
@@ -412,11 +417,12 @@ async def upload_screenshot(
 
     with open(file_path, "wb") as f:
         f.write(await file.read())
-
+        
+    relative_path = f"{current_user.id}/{date_folder}/{filename}"
     screenshot = Screenshots(
         employee_id=current_user.id,
         timesheet_id=time_sheet.id,
-        filepath=str(file_path),
+        filepath=relative_path,
         timestamp=date.today()
     )
     session.add(screenshot)
@@ -433,7 +439,7 @@ def list_screenshots(
     session: Session = Depends(get_session),
     current_user = Depends(get_current_user("employee")),
 ):
-    shots = session.exec(
+    screenshots = session.exec(
         select(Screenshots)
         .where(
                Screenshots.employee_id == current_user.id,
@@ -441,14 +447,31 @@ def list_screenshots(
         .order_by(Screenshots.timestamp.desc())
     ).all()
 
+    timesheet_ids = [s.timesheet_id for s in screenshots]
+    if not timesheet_ids:
+        return {"screenshots": []}
+    
+    appusage = session.exec(select(AppUsage).where(
+        AppUsage.timesheet_id.in_(timesheet_ids)
+        )).all()
+
+    app_dict = {}
+    
+    for a in appusage:
+        if a.timesheet_id not in app_dict:
+            app_dict[a.timesheet_id] = []
+        app_dict[a.timesheet_id].append(a)
+    
+    api_url = "http://localhost:9000/employee/screenshot"
     return {
         "screenshots": [
             {
                 "id": s.id,
-                "image_url": f"/api/screenshot/{s.id}",
+                "image_url": f"{api_url}/{s.id}",
                 "timestamp": s.timestamp,
+                "Appname": list(set([proper_app_name(a.app) for a in app_dict.get(s.timesheet_id, [])]))
             }
-            for s in shots
+            for s in screenshots
         ]
     }
 
@@ -463,10 +486,15 @@ def get_screenshot(
     if not s or s.employee_id != current_user.id:
         raise HTTPException(status_code=404)
 
-    if not os.path.exists(s.filepath):
-        raise HTTPException(status_code=404, detail="File not found on disk")
-
-    return FileResponse(s.filepath, media_type="image/png")
+    # Clean the path just in case the DB stored it weirdly
+    clean_path = s.filepath.replace("screenshots/", "").replace("screenshots\\", "")
+    
+    full_path = BASE_DIR / clean_path
+    print(f"DEBUG: Looking for file at: {full_path}") 
+    if not full_path.exists():
+        raise HTTPException(status_code=404, detail=f"File not found on disk: {full_path}")
+    
+    return FileResponse(full_path, media_type="image/png")
 
 
 @router.get('/get_employee_screenshots_week')
@@ -485,10 +513,33 @@ def get_employee_screenshots_week(
         )
     ).all()
     
-    if not screenshots:
+    timesheet_ids = [s.timesheet_id for s in screenshots]
+    if not timesheet_ids:
         return {"screenshots": []}
     
-    return {"screenshots": screenshots}
+    appusage = session.exec(select(AppUsage).where(
+        AppUsage.timesheet_id.in_(timesheet_ids)
+        )).all()
+
+    app_dict = {}
+    
+    for a in appusage:
+        if a.timesheet_id not in app_dict:
+            app_dict[a.timesheet_id] = []
+        app_dict[a.timesheet_id].append(a)
+        
+    api_url = "http://localhost:9000/employee/screenshot"
+    return {
+        "screenshots": [
+            {
+                "id": s.id,
+                "image_url": f"{api_url}/{s.id}",
+                "timestamp": s.timestamp,
+                "Appname": list(set([proper_app_name(a.app) for a in app_dict.get(s.timesheet_id, [])]))
+            }
+            for s in screenshots
+        ]
+    }
 
 
 
@@ -780,3 +831,47 @@ def admin_recalculate_stats_now(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to trigger calculation: {str(e)}")
+
+
+def proper_app_name(app_name: str) -> str:
+
+    name = app_name.lower()
+    if "chrome" in name:
+        return "Google Chrome"
+    if "firefox" in name:
+        return "Mozilla Firefox"
+    if "code" in name or "vscode" in name:
+        return "Visual Studio Code"
+    if "word" in name:
+        return "Microsoft Word"
+    if "excel" in name:
+        return "Microsoft Excel"
+    if "powerpoint" in name:
+        return "Microsoft PowerPoint"
+    if "outlook" in name:
+        return "Microsoft Outlook"
+    if "teams" in name:
+        return "Microsoft Teams"
+    if "zoom" in name:
+        return "Zoom"
+    if "slack" in name:
+        return "Slack"
+    if "app.exe" in name:
+        return "My App"
+    if "msedgewebview" in name:
+        return "System Webview"
+    if "chatgpt" in name:
+        return "ChatGPT"
+    if "notepad" in name:
+        return "Notepad"
+    if "cursor" in name:
+        return "Cursor IDE"
+    if "antigravity" in name:
+        return "Antigravity"
+    if "pycharm" in name:
+        return "PyCharm"
+    if "sublime" in name:
+        return "Sublime Text"
+
+    return app_name.replace(".exe", "").capitalize()
+    

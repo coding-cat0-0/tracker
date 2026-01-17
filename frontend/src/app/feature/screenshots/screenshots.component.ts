@@ -3,13 +3,13 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/authservice';
-
+import { ActivatedRoute } from '@angular/router';
 interface Screenshot {
   id: number;
-  employee_id: number;
-  timesheet_id: number;
-  filepath: string;
+  image_url: string;
   timestamp: string;
+  Appname: string[];
+  safeURL: string;
 }
 
 interface Employee {
@@ -22,7 +22,7 @@ interface Employee {
 @Component({
   selector: 'app-screenshots',
   standalone: true,
-  imports: [CommonModule, FormsModule, HttpClientModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './screenshots.component.html',
   styleUrl: './screenshots.component.css'
 })
@@ -30,27 +30,34 @@ export class ScreenshotsComponent implements OnInit {
   screenshots: Screenshot[] = [];
   employees: Employee[] = [];
   selectedEmployeeId: number | null = null;
-  dateRange: 'today' | 'week' = 'today';  // Dropdown for employees
+  // Removed dateRange: filtering now handled by sidebar via query param
   fullImageUrl: string | null = null;
+  selectedScreenshot: Screenshot | null = null;
   isLoading = false;
   errorMessage: string | null = null;
 
-  constructor(private http: HttpClient, public auth: AuthService) {}
+  constructor(private http: HttpClient, public auth: AuthService, private route: ActivatedRoute) {}
 
   ngOnInit() {
-
     if (!this.auth.isAuthenticated()) {
       this.errorMessage = 'You must be logged in to view screenshots';
       return;
     }
 
-
-    setTimeout(() => {    if (this.auth.isAdmin()) {
-          this.loadEmployees();
-          this.loadAllEmployeesScreenshots();
-        } else if (this.auth.isEmployee()) {
+    this.route.queryParams.subscribe(params => {
+      // Sidebar sets 'view' param: 'current' or 'weekly'
+      const view = params['view'] || 'current';
+      if (this.auth.isAdmin()) {
+        this.loadEmployees();
+        this.loadAllEmployeesScreenshots();
+      } else if (this.auth.isEmployee()) {
+        if (view === 'weekly') {
+          this.loadEmployeeScreenshotsWeek();
+        } else {
           this.loadEmployeeScreenshots();
-        }}, 0)
+        }
+      }
+    });
   }
 
 
@@ -74,13 +81,15 @@ export class ScreenshotsComponent implements OnInit {
 
     this.http.get<{screenshots: Screenshot[]}>('http://localhost:9000/admin/get_screenshots').subscribe({
       next: (res) => {
-        this.screenshots = this.filterScreenshotsByDate(res.screenshots);
+        this.screenshots = res.screenshots;
         this.isLoading = false;
+        this.loadThumbnails();     
       },
       error: (err) => {
         console.error('Error fetching screenshots:', err);
         this.errorMessage = 'Failed to load screenshots';
         this.isLoading = false;
+
       }
     });
   }
@@ -94,8 +103,9 @@ export class ScreenshotsComponent implements OnInit {
       `http://localhost:9000/admin/get_screenshots?employee_id=${employeeId}`
     ).subscribe({
       next: (res) => {
-        this.screenshots = this.filterScreenshotsByDate(res.screenshots);
+        this.screenshots = res.screenshots;
         this.isLoading = false;
+        this.loadThumbnails();
       },
       error: (err) => {
         console.error('Error fetching screenshots:', err);
@@ -114,8 +124,9 @@ export class ScreenshotsComponent implements OnInit {
       'http://localhost:9000/employee/get_screenshots'
     ).subscribe({
       next: (res) => {
-        this.screenshots = this.filterScreenshotsByDate(res.screenshots);
+        this.screenshots = res.screenshots;
         this.isLoading = false;
+        this.loadThumbnails();
       },
       error: (err) => {
         console.error('Error fetching your screenshots:', err);
@@ -136,21 +147,16 @@ export class ScreenshotsComponent implements OnInit {
       next: (res) => {
         this.screenshots = res.screenshots;  
         this.isLoading = false;
+        this.loadThumbnails();
       },
       error: (err) => {
         console.error('Error fetching your screenshots:', err);
         this.errorMessage = 'Failed to load your screenshots';
         this.isLoading = false;
+
       }
     });
   }
-
-
-  filterScreenshotsByDate(screenshots: Screenshot[]): Screenshot[] {
-    const today = new Date().toISOString().split('T')[0];
-    return screenshots.filter((ss) => ss.timestamp.split('T')[0] === today);
-  }
-
 
   onEmployeeChange() {
     if (this.selectedEmployeeId === null) {
@@ -160,33 +166,52 @@ export class ScreenshotsComponent implements OnInit {
     }
   }
 
-  onDateRangeChange() {
-    if (this.dateRange === 'today') {
-      this.loadEmployeeScreenshots();
-    } else {
-      this.loadEmployeeScreenshotsWeek();
-    }
-  }
+  // Removed onDateRangeChange: filtering now handled by sidebar
 
 
   onClick(ssId: number) {
-    this.http.get(
-      `http://localhost:9000/employee/screenshot?screenshot_id=${ssId}`,
-      { responseType: 'blob' }
-    ).subscribe({
-      next: (blob) => {
-        const imageUrl = URL.createObjectURL(blob);
-        this.fullImageUrl = imageUrl;
-      },
-      error: (err) => {
-        console.error('Error loading screenshot:', err);
-        this.errorMessage = 'Failed to load screenshot';
-      }
+    const screenshot = this.screenshots.find(ss => ss.id === ssId);
+    if (!screenshot) {
+      this.errorMessage = 'Screenshot not found';
+      return;
+    }
+    this.selectedScreenshot = screenshot; // Set selected screenshot for modal details
+
+    if (screenshot.safeURL) {
+      this.fullImageUrl = screenshot.safeURL;
+    } else {
+      this.http.get(screenshot.image_url, { responseType: 'blob' }).subscribe({
+        next: (blob) => {
+          this.fullImageUrl = URL.createObjectURL(blob);
+        },
+        error: (err) => {
+          console.error('Error loading screenshot:', err);
+          this.errorMessage = 'Failed to load screenshot';
+        }
+      });
+    }
+  }
+
+  loadThumbnails(){
+    this.screenshots.forEach(ss => {
+      this.http.get(ss.image_url,
+        { responseType: 'blob' }
+      ).subscribe({
+        next: (blob) => {
+          ss.safeURL = URL.createObjectURL(blob);
+        },
+        error: (err) => {
+          console.error(`Error loading thumbnail of image: ${ss.id}`, err);
+          ss.safeURL = 'assets/placeholder.png';
+        }
+      });
     });
+
   }
 
   closePreview() {
     this.fullImageUrl = null;
+    this.selectedScreenshot = null;
   }
 }
 

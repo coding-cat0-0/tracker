@@ -1,1 +1,6 @@
-<router-outlet></router-outlet>
+<div class="main-layout">
+  <app-sidebar *ngIf="!isAuthRoute()"></app-sidebar>
+  <div class="main-content">
+    <router-outlet></router-outlet>
+  </div>
+</div>

@@ -24,7 +24,7 @@ interface Employee {
 @Component({
   selector: 'app-reports',
   standalone: true,
-  imports: [CommonModule, FormsModule, HttpClientModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './reports.component.html',
   styleUrl: './reports.component.css'
 })
@@ -38,7 +38,7 @@ export class ReportsComponent implements OnInit {
   isLoading = false;
   reason: string = '';
   body: string = '';
-
+  showApplicationForm: boolean = false;
   constructor(private http: HttpClient, public auth: AuthService) {}
 
   ngOnInit() {
@@ -153,7 +153,6 @@ export class ReportsComponent implements OnInit {
   }
 
   submitApplication() {
-    // Validate reason is selected
     if (!this.reason.trim()) {
       this.errorMessage = 'Please select a reason';
       return;
@@ -194,11 +193,10 @@ export class ReportsComponent implements OnInit {
 
   viewApplications() {
     this.isLoading = true;
-    this.http.get<Applications[]>('http://localhost:9000/employee/see_your_applications').subscribe({
+    this.http.get<Applications[]>(`http://localhost:9000/employee/see_your_applications?status=${this.selectedStatus}`).subscribe({
       next: (res) => {
         this.applications = res;
-        this.selectedStatus = 'pending';  // Default to pending
-        this.filterApplicationsByStatus();
+        this.filteredApplications = res;
         this.isLoading = false;
       },
       error: (error) => {
@@ -213,9 +211,7 @@ export class ReportsComponent implements OnInit {
    * Filters applications based on selected status (for employee view)
    */
   filterApplicationsByStatus() {
-    this.filteredApplications = this.applications.filter(
-      app => app.status === this.selectedStatus
-    );
+    this.viewApplications();
   }
 
   /**

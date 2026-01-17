@@ -1,65 +1,77 @@
 <div class="screenshots-page">
-  <h2 *ngIf="auth.isAdmin()">Screenshots - All Employees</h2>
-  <h2 *ngIf="auth.isEmployee()">My Screenshots</h2>
+  <!-- Header Section -->
+  <div class="header-section">
+    <h2 *ngIf="auth.isAdmin()">Screenshots - All Employees</h2>
+    <h2 *ngIf="auth.isEmployee()">My Screenshots</h2>
+    
+    <div class="filter-section" *ngIf="auth.isAdmin()">
+      <label for="employee-select">Select Employee:</label>
+      <select
+        id="employee-select"
+        [(ngModel)]="selectedEmployeeId"
+        (change)="onEmployeeChange()"
+        class="employee-select"
+      >
+        <option [value]="null">All Employees</option>
+        <option *ngFor="let employee of employees" [value]="employee.id">
+          {{ employee.name }}
+        </option>
+      </select>
+    </div>
 
-  <!-- Error Message -->
+    <!-- Date range filter removed: handled by sidebar via query param -->
+  </div>
+
   <div *ngIf="errorMessage" class="error-message">
     {{ errorMessage }}
   </div>
 
-  <!-- Employee Filter - Admin Only -->
-  <div class="filter-section" *ngIf="auth.isAdmin()">
-    <label for="employee-select">Select Employee:</label>
-    <select
-      id="employee-select"
-      [(ngModel)]="selectedEmployeeId"
-      (change)="onEmployeeChange()"
-      class="employee-select"
-    >
-      <option [value]="null">All Employees</option>
-      <option *ngFor="let employee of employees" [value]="employee.id">
-        {{ employee.name }}
-      </option>
-    </select>
-  </div>
-
-  <!-- Date Range Filter - Employee Only -->
-  <div class="filter-section" *ngIf="auth.isEmployee()">
-    <label for="date-range-select">Date Range:</label>
-    <select
-      id="date-range-select"
-      [(ngModel)]="dateRange"
-      (change)="onDateRangeChange()"
-      class="date-range-select"
-    >
-      <option value="today">Today</option>
-      <option value="week">Past 7 Days</option>
-    </select>
-  </div>
-
-  <!-- Loading Indicator -->
   <div *ngIf="isLoading" class="loading">
     Loading screenshots...
   </div>
 
-  <!-- Screenshots Grid -->
   <div class="grid" *ngIf="!isLoading">
-    <img
-      *ngFor="let ss of screenshots"
-      [src]="'data:image/png;base64,' + ss.filepath"
-      (click)="onClick(ss.id)"
-      class="thumbnail"
-      [alt]="'Screenshot ' + ss.id"
-    />
+    <div *ngFor="let ss of screenshots" class="screenshot-card">
+      <img
+        [src]="ss.safeURL || null" 
+        (click)="onClick(ss.id)"
+        class="thumbnail"
+        [alt]="'Screenshot ' + ss.id"
+      />
+      
+      <div class="card-content">
+        <span class="timestamp">{{ ss.timestamp | date:'medium' }}</span>
+        
+        <!-- App Badges Preview -->
+        <div class="app-badges" *ngIf="ss.Appname && ss.Appname.length">
+          <span *ngFor="let app of ss.Appname.slice(0, 4)" class="badge" title="{{app}}">
+            {{ app }}
+          </span>
+          <span *ngIf="ss.Appname.length > 4" class="badge-more" title="More apps...">
+            +{{ ss.Appname.length - 4 }}
+          </span>
+        </div>
+      </div>
+    </div>
+    
     <div *ngIf="screenshots.length === 0" class="no-screenshots">
       No screenshots found for the selected criteria.
     </div>
   </div>
 
-  <!-- Modal for Full Image Preview -->
+  <!-- Improved Modal -->
   <div class="modal" *ngIf="fullImageUrl">
     <div class="overlay" (click)="closePreview()"></div>
-    <img [src]="fullImageUrl" class="full-image" />
+    <div class="modal-content-wrapper">
+        <img [src]="fullImageUrl" class="full-image" />
+        
+        <!-- Full App List Strip -->
+        <div class="full-app-list" *ngIf="selectedScreenshot && selectedScreenshot.Appname && selectedScreenshot.Appname.length">
+            <span *ngFor="let app of selectedScreenshot.Appname" class="large-badge">
+                {{ app }}
+            </span>
+        </div>
+    </div>
   </div>
 </div>
 

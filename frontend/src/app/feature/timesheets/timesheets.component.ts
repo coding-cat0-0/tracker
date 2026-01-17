@@ -3,6 +3,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 
 interface Timesheet {
   id: number;
@@ -56,17 +57,26 @@ export class TimesheetsComponent implements OnInit, OnDestroy {
   idleTimeSeconds: number = 0;
   idlePeriods: IdlePeriod[] = [];
 
-  constructor(private http: HttpClient, public auth: AuthService) {}
+  constructor(private http: HttpClient, public auth: AuthService, private route: ActivatedRoute) {}
 
   ngOnDestroy() {
   }
 
-  ngOnInit() {
 
+  ngOnInit() {
     if (!this.auth.isAuthenticated()) {
       this.errorMessage = 'You must be logged in to view timesheets';
       return;
     }
+
+    this.route.queryParams.subscribe(params => {
+      const view = params['view'];
+      if (view === 'weekly') {
+        this.setDateRange('week');
+      } else {
+        this.setDateRange('today');
+      }
+    });
 
     setTimeout(() => {
       if (this.auth.isAdmin()) {
@@ -75,9 +85,7 @@ export class TimesheetsComponent implements OnInit, OnDestroy {
           this.loadAllEmployeesTimesheets();
         });
       } else if (this.auth.isEmployee()) {
-        console.log('Employee mode - Auth username:', this.auth.username());
         this.userName = this.auth.username() || 'Employee';
-        console.log('Set userName to:', this.userName);
         this.loadEmployeeTimesheets();
       }
     }, 0);
